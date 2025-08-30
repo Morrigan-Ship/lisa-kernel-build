@@ -1,0 +1,56 @@
+name: Kernel Build Lisa
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+      with:
+        submodules: true
+
+    - name: Set up build environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y git wget build-essential bc bison flex \
+          libncurses5-dev libssl-dev curl zip unzip python-is-python3
+
+    - name: Download kernel source (Lisa r-oss)
+      run: |
+        git clone --depth=1 https://github.com/MiCode/Xiaomi_Kernel_OpenSource -b lisa-r-oss kernel/lisa
+
+    - name: Download clang toolchain
+      run: |
+        mkdir clang
+        cd clang
+        wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/master/clang-r416183b.tar.gz
+        tar -xf clang-r416183b.tar.gz
+        cd ..
+
+    - name: Build kernel
+      run: |
+        export PATH=$GITHUB_WORKSPACE/clang/bin:$PATH
+        cd kernel/lisa
+        make O=out ARCH=arm64 vendor/lisa_defconfig
+        make -j$(nproc) O=out ARCH=arm64 \
+          CC=clang \
+          CLANG_TRIPLE=aarch64-linux-gnu- \
+          CROSS_COMPILE=aarch64-linux-gnu- \
+          CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+        cp out/arch/arm64/boot/Image.gz-dtb $GITHUB_WORKSPACE/AnyKernel3/
+
+    - name: Package AnyKernel3 zip
+      run: |
+        cd AnyKernel3
+        zip -r9 Lisa-Kernel-NH.zip * -x .git README.md *placeholder
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: Lisa-Kernel-NH
+        path: AnyKernel3/Lisa-Kernel-NH.zip
+        
