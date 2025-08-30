@@ -24,12 +24,12 @@ jobs:
         git clone --depth=1 https://github.com/MiCode/Xiaomi_Kernel_OpenSource -b lisa-r-oss kernel/lisa
 
     - name: Download Clang toolchain
-  run: |
-    mkdir clang
-    cd clang
-    wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz
-    tar -xf clang-r547379.tar.gz
-    cd ..
+      run: |
+        mkdir clang
+        cd clang
+        wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz
+        tar -xf clang-r547379.tar.gz
+        cd ..
 
 
 
