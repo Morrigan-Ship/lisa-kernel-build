@@ -37,7 +37,7 @@ jobs:
       run: |
         export PATH=$GITHUB_WORKSPACE/clang/bin:$PATH
         cd kernel/lisa
-        make O=out ARCH=arm64 vendor/lisa_defconfig
+        make O=out ARCH=arm64 vendor/defconfig
         make -j$(nproc) O=out ARCH=arm64 \
           CC=clang \
           CLANG_TRIPLE=aarch64-linux-gnu- \
