@@ -47,7 +47,10 @@ jobs:
       run: |
         export PATH=$GITHUB_WORKSPACE/clang/bin:$PATH
         cd kernel/lisa
-        make O=out ARCH=arm64 lisa_defconfig
+        mkdir -p out
+        make O=out clean \
+        make O=out mrproper \
+        make O=out ARCH=arm64 gki_defconfig \
         make -j$(nproc) O=out ARCH=arm64 \
           CC=clang \
           CLANG_TRIPLE=aarch64-linux-gnu- \
