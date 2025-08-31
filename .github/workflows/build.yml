@@ -26,7 +26,10 @@ jobs:
     - name: Download kernel source (Lisa r-oss)
       run: |
         git clone --depth=1 https://github.com/MiCode/Xiaomi_Kernel_OpenSource -b lisa-r-oss kernel/lisa
-
+        - name: Copy custom defconfig
+      run: |
+        cp $GITHUB_WORKSPACE/lisa_defconfig kernel/lisa/arch/arm64/configs/lisa_defconfig
+        
     - name: Download Clang toolchain
       run: |
         mkdir clang
@@ -44,7 +47,7 @@ jobs:
       run: |
         export PATH=$GITHUB_WORKSPACE/clang/bin:$PATH
         cd kernel/lisa
-        make O=out ARCH=arm64 defconfig
+        make O=out ARCH=arm64 lisa_defconfig
         make -j$(nproc) O=out ARCH=arm64 \
           CC=clang \
           CLANG_TRIPLE=aarch64-linux-gnu- \
