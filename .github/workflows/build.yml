@@ -26,7 +26,7 @@ jobs:
     - name: Download kernel source (Lisa r-oss)
       run: |
         git clone --depth=1 https://github.com/MiCode/Xiaomi_Kernel_OpenSource -b lisa-r-oss kernel/lisa
-        - name: Copy custom defconfig
+    - name: Copy custom defconfig
       run: |
         cp $GITHUB_WORKSPACE/lisa_defconfig kernel/lisa/arch/arm64/configs/lisa_defconfig
         
