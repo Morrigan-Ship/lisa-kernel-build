@@ -21,7 +21,7 @@ jobs:
           gcc-arm-linux-gnueabi \
           bc bison flex libssl-dev make
         sudo apt-get install -y git wget build-essential bc bison flex \
-          libncurses5-dev libssl-dev curl zip unzip python-is-python3
+          libncurses5-dev libssl-dev curl zip unzip python-is-python3 clang
 
     - name: Download kernel source (Lisa r-oss)
       run: |
@@ -30,14 +30,6 @@ jobs:
       run: |
         cp $GITHUB_WORKSPACE/lisa_defconfig kernel/lisa/arch/arm64/configs/lisa_defconfig
         
-    - name: Download Clang toolchain
-      run: |
-        mkdir clang
-        cd clang
-        wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz
-        tar -xf clang-r547379.tar.gz
-        cd ..
-
 
     - name: Download AnyKernel3
       run: |
@@ -48,9 +40,10 @@ jobs:
         export PATH=$GITHUB_WORKSPACE/clang/bin:$PATH
         cd kernel/lisa
         mkdir -p out
-        make O=out clean \
-        make O=out mrproper \
-        make O=out ARCH=arm64 gki_defconfig \
+        make O=out clean
+        make O=out mrproper
+        make O=out ARCH=arm64 gki_defconfig
+        make O=out ARCH=arm64 olddefconfig
         make -j$(nproc) O=out ARCH=arm64 \
           CC=clang \
           CLANG_TRIPLE=aarch64-linux-gnu- \
