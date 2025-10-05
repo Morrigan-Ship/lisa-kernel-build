@@ -23,39 +23,51 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt update
-        sudo apt install -y build-essential git pkg-config python3 python3-pip clang libssl-dev libelf-dev unzip curl radare2
+        sudo apt install -y build-essential git pkg-config python3 python3-pip clang libssl-dev libelf-dev unzip curl
 
-    # 3️⃣ Descarcă și dezarhivează Android NDK
+    # 3️⃣ Instalare Meson și Ninja (pentru Frida)
+    - name: Install Meson and Ninja
+      run: |
+        python3 -m pip install --user meson ninja
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+    # 4️⃣ Descarcă și dezarhivează Android NDK
     - name: Download Android NDK
       run: |
         curl -LO https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
-        unzip android-ndk-${ANDROID_NDK_VERSION}-linux.zip -d $GITHUB_WORKSPACE/android-ndk
+        unzip android-ndk-${ANDROID_NDK_VERSION}-linux.zip -d $ANDROID_NDK_HOME
 
-    # 4️⃣ Setare PATH pentru NDK și toolchain
-    - name: Setup NDK toolchain
+    # 5️⃣ Clone radare2 și r2frida
+    - name: Clone repositories
       run: |
-        echo "$ANDROID_NDK_HOME/android-ndk-${ANDROID_NDK_VERSION}/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
-        export CC=aarch64-linux-android${ANDROID_API}-clang
-        export CXX=aarch64-linux-android${ANDROID_API}-clang++
-
-    # 5️⃣ Clone r2frida
-    - name: Clone r2frida
-      run: |
+        git clone --depth=1 https://github.com/radareorg/radare2.git
         git clone --depth=1 --recursive https://github.com/nowsecure/r2frida.git
 
-    # 6️⃣ Build r2frida
+    # 6️⃣ Build radare2 pentru Android
+    - name: Build radare2 for Android
+      run: |
+        cd radare2
+        export PATH=$ANDROID_NDK_HOME/android-ndk-${ANDROID_NDK_VERSION}/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
+        export CC=aarch64-linux-android${ANDROID_API}-clang
+        export CXX=aarch64-linux-android${ANDROID_API}-clang++
+        ./configure --prefix=$GITHUB_WORKSPACE/android-r2 --host=aarch64-linux-android
+        make -j$(nproc)
+        make install
+        cd ..
+
+    # 7️⃣ Build r2frida pentru Android
     - name: Build r2frida
       run: |
         cd r2frida
         make clean || true
         rm -rf node_modules ext/frida*
         export R2PM_OFFLINE=1
+        export PATH=$GITHUB_WORKSPACE/android-r2/bin:$PATH
         make io_frida.so
 
-    # 7️⃣ Upload artifact
+    # 8️⃣ Upload artifact
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: r2frida-android-arm64
         path: r2frida/src/io_frida.so
-        
