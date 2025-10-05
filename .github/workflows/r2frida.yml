@@ -12,7 +12,7 @@ jobs:
     env:
       ANDROID_NDK_VERSION: r25c
       ANDROID_API: 33
-      ANDROID_NDK_HOME: ${{ github.workspace }}/android-ndk/android-ndk-r25c
+      ANDROID_NDK_HOME: ${{ github.workspace }}/android-ndk
 
     steps:
     # 1️⃣ Checkout surse
@@ -23,47 +23,27 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt update
-        sudo apt install -y build-essential git pkg-config python3 python3-pip clang libssl-dev libelf-dev unzip curl
+        sudo apt install -y build-essential git pkg-config python3 python3-pip clang libssl-dev libelf-dev unzip curl radare2
 
     # 3️⃣ Descarcă și dezarhivează Android NDK
     - name: Download Android NDK
       run: |
         curl -LO https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
-        unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip -d $GITHUB_WORKSPACE/android-ndk
+        unzip android-ndk-${ANDROID_NDK_VERSION}-linux.zip -d $GITHUB_WORKSPACE/android-ndk
 
-    # 4️⃣ Setare toolchain + sysroot
+    # 4️⃣ Setare PATH pentru NDK și toolchain
     - name: Setup NDK toolchain
       run: |
-        export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
-        echo "TOOLCHAIN=$TOOLCHAIN" >> $GITHUB_ENV
-        echo "CC=$TOOLCHAIN/bin/aarch64-linux-android${ANDROID_API}-clang" >> $GITHUB_ENV
-        echo "CXX=$TOOLCHAIN/bin/aarch64-linux-android${ANDROID_API}-clang++" >> $GITHUB_ENV
-        echo "AR=$TOOLCHAIN/bin/llvm-ar" >> $GITHUB_ENV
-        echo "LD=$TOOLCHAIN/bin/ld" >> $GITHUB_ENV
-        echo "AS=$TOOLCHAIN/bin/llvm-as" >> $GITHUB_ENV
-        echo "CFLAGS=--sysroot=$TOOLCHAIN/sysroot" >> $GITHUB_ENV
-        echo "LDFLAGS=--sysroot=$TOOLCHAIN/sysroot" >> $GITHUB_ENV
-        echo "$TOOLCHAIN/bin" >> $GITHUB_PATH
+        echo "$ANDROID_NDK_HOME/android-ndk-${ANDROID_NDK_VERSION}/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
+        export CC=aarch64-linux-android${ANDROID_API}-clang
+        export CXX=aarch64-linux-android${ANDROID_API}-clang++
 
-    # 5️⃣ Clone radare2 și r2frida
-    - name: Clone repositories
+    # 5️⃣ Clone r2frida
+    - name: Clone r2frida
       run: |
-        git clone --depth=1 https://github.com/radareorg/radare2.git
         git clone --depth=1 --recursive https://github.com/nowsecure/r2frida.git
 
-    # 6️⃣ Build radare2 pentru Android
-    - name: Build radare2
-      run: |
-        cd radare2
-        export CFLAGS="--sysroot=$TOOLCHAIN/sysroot -D__ANDROID_API__=$ANDROID_API -DANDROID -Wno-error"
-        export LDFLAGS="--sysroot=$TOOLCHAIN/sysroot"
-        ./configure --prefix=$GITHUB_WORKSPACE/android-r2 --host=aarch64-linux-android --without-pthread
-        make -j$(nproc)
-        make install
-        cd ..
-
-
-    # 7️⃣ Build r2frida
+    # 6️⃣ Build r2frida
     - name: Build r2frida
       run: |
         cd r2frida
@@ -72,9 +52,10 @@ jobs:
         export R2PM_OFFLINE=1
         make io_frida.so
 
-    # 8️⃣ Upload artifact
+    # 7️⃣ Upload artifact
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: r2frida-android-arm64
-        path: r2frida/io_frida.so
+        path: r2frida/src/io_frida.so
+        
