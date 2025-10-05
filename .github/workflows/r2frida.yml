@@ -10,82 +10,65 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      FRIDA_VER: "17.3.2"
-      ANDROID_API: "33"
+      ANDROID_NDK_VERSION: r25c
+      ANDROID_API: 33
+      ANDROID_NDK_HOME: ${{ github.workspace }}/android-ndk/android-ndk-r25c
 
     steps:
+    # 1️⃣ Checkout surse
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Install build dependencies
+    # 2️⃣ Instalare dependențe Ubuntu
+    - name: Install dependencies
       run: |
         sudo apt update
-        sudo apt install -y build-essential git pkg-config python3 python3-pip clang libssl-dev libelf-dev unzip curl xz-utils
+        sudo apt install -y build-essential git pkg-config python3 python3-pip \
+          clang libssl-dev libelf-dev unzip curl xz-utils
         pip3 install --user meson ninja
-        echo "::add-path::${HOME}/.local/bin" || true
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
 
+    # 3️⃣ Descarcă și dezarhivează Android NDK
     - name: Download Android NDK
       run: |
-        curl -LO https://dl.google.com/android/repository/android-ndk-r25c-linux.zip
-        unzip -q android-ndk-r25c-linux.zip -d $GITHUB_WORKSPACE/android-ndk
-      # set ANDROID_NDK_HOME to the extracted subfolder for future steps
-    - name: Export NDK env
-      run: |
-        echo "ANDROID_NDK_HOME=${GITHUB_WORKSPACE}/android-ndk/android-ndk-r25c" >> $GITHUB_ENV
-        echo "PATH=${GITHUB_WORKSPACE}/android-ndk/android-ndk-r25c/toolchains/llvm/prebuilt/linux-x86_64/bin:${PATH}" >> $GITHUB_ENV
+        curl -LO https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+        unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip -d $GITHUB_WORKSPACE/android-ndk
 
-    - name: Set cross compiler env vars
+    # 4️⃣ Setare PATH pentru NDK și toolchain
+    - name: Setup NDK toolchain
       run: |
-        # create clang wrappers variables for API
-        echo "CC=${GITHUB_WORKSPACE}/android-ndk/android-ndk-r25c/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android${ANDROID_API}-clang" >> $GITHUB_ENV
-        echo "CXX=${GITHUB_WORKSPACE}/android-ndk/android-ndk-r25c/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android${ANDROID_API}-clang++" >> $GITHUB_ENV
-        # useful tools
-        echo "AR=llvm-ar" >> $GITHUB_ENV
-        echo "RANLIB=llvm-ranlib" >> $GITHUB_ENV
+        echo "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
+        echo "CC=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android${ANDROID_API}-clang" >> $GITHUB_ENV
+        echo "CXX=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android${ANDROID_API}-clang++" >> $GITHUB_ENV
 
-    - name: Clone radare2 and build (install into workspace)
+    # 5️⃣ Clone radare2 și r2frida
+    - name: Clone repositories
       run: |
         git clone --depth=1 https://github.com/radareorg/radare2.git
-        cd radare2
-        ./sys/install.sh
-        # install goes to /usr/local by default; ensure pkg-config finds it
-        echo "PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/usr/local/share/pkgconfig" >> $GITHUB_ENV
-        # make r2 and r2pm available
-        echo "PATH=/usr/local/bin:${PATH}" >> $GITHUB_ENV
-      env:
-        PATH: ${{ env.PATH }}
-
-    - name: Prepare frida devkit for android (ext/frida)
-      run: |
         git clone --depth=1 --recursive https://github.com/nowsecure/r2frida.git
-        cd r2frida
-        mkdir -p ext
-        cd ext
-        FRIDA_TGZ="frida-core-devkit-${FRIDA_VER}-android-arm64.tar.xz"
-        curl -L -o ${FRIDA_TGZ} "https://github.com/frida/frida/releases/download/${FRIDA_VER}/${FRIDA_TGZ}"
-        mkdir -p frida-android-${FRIDA_VER}
-        tar -xJf ${FRIDA_TGZ} -C frida-android-${FRIDA_VER} --strip-components=1
-        ln -sf frida-android-${FRIDA_VER} frida
-        cd ../..
 
-    - name: Build r2frida (cross compile)
+    # 6️⃣ Build radare2 pentru Android
+    - name: Build radare2
+      run: |
+        cd radare2
+        ./configure --prefix=$GITHUB_WORKSPACE/android-r2 --host=aarch64-linux-android
+        make -j$(nproc)
+        make install
+        cd ..
+
+    # 7️⃣ Build r2frida
+    - name: Build r2frida
       run: |
         cd r2frida
         make clean || true
-        rm -rf node_modules
+        rm -rf node_modules ext/frida*
         export R2PM_OFFLINE=1
-        # ensure r2/r2pm and pkg-config are found (from earlier radare2 install)
-        export PATH=/usr/local/bin:$PATH
-        export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/usr/local/share/pkgconfig
-        # pass CC/CXX from environment persisted in previous steps via GITHUB_ENV
         make io_frida.so
-      env:
-        # CC/CXX will be read from GITHUB_ENV; set fallback too
-        CC: ${{ env.CC }}
-        CXX: ${{ env.CXX }}
 
+    # 8️⃣ Upload artifact
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: r2frida-android-arm64
-        path: r2frida/src/io_frida.so
+        path: r2frida/io_frida.so
+        
