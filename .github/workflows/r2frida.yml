@@ -55,10 +55,13 @@ jobs:
     - name: Build radare2
       run: |
         cd radare2
-        ./configure --prefix=$GITHUB_WORKSPACE/android-r2 --host=aarch64-linux-android
+        export CFLAGS="--sysroot=$TOOLCHAIN/sysroot -D__ANDROID_API__=$ANDROID_API -DANDROID -Wno-error"
+        export LDFLAGS="--sysroot=$TOOLCHAIN/sysroot"
+        ./configure --prefix=$GITHUB_WORKSPACE/android-r2 --host=aarch64-linux-android --without-pthread
         make -j$(nproc)
         make install
         cd ..
+
 
     # 7️⃣ Build r2frida
     - name: Build r2frida
