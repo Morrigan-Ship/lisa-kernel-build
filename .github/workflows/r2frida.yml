@@ -1,0 +1,71 @@
+name: Build r2frida Android ARM64
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      ANDROID_NDK_VERSION: r25c
+      ANDROID_API: 33
+      ANDROID_NDK_HOME: ${{ github.workspace }}/android-ndk
+
+    steps:
+    # 1️⃣ Checkout surse
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    # 2️⃣ Instalare dependențe Ubuntu
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y build-essential git pkg-config python3 python3-pip clang libssl-dev libelf-dev unzip curl
+
+    # 3️⃣ Descarcă și dezarhivează Android NDK
+    - name: Download Android NDK
+      run: |
+        curl -LO https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+        unzip android-ndk-${ANDROID_NDK_VERSION}-linux.zip -d $GITHUB_WORKSPACE/android-ndk
+
+    # 4️⃣ Setare PATH pentru NDK și toolchain
+    - name: Setup NDK toolchain
+      run: |
+        export PATH=$ANDROID_NDK_HOME/android-ndk-${ANDROID_NDK_VERSION}:$PATH
+        export CC=$ANDROID_NDK_HOME/android-ndk-${ANDROID_NDK_VERSION}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android${ANDROID_API}-clang
+        export CXX=$ANDROID_NDK_HOME/android-ndk-${ANDROID_NDK_VERSION}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android${ANDROID_API}-clang++
+
+    # 5️⃣ Clone radare2 și r2frida (dacă nu sunt deja)
+    - name: Clone repositories
+      run: |
+        git clone --depth=1 https://github.com/radareorg/radare2.git
+        git clone --depth=1 --recursive https://github.com/nowsecure/r2frida.git
+
+    # 6️⃣ Build radare2 pentru Android (cross-compilation)
+    - name: Build radare2
+      run: |
+        cd radare2
+        ./configure --prefix=$GITHUB_WORKSPACE/android-r2 --host=aarch64-linux-android
+        make -j$(nproc)
+        make install
+        cd ..
+
+    # 7️⃣ Build r2frida
+    - name: Build r2frida
+      run: |
+        cd r2frida
+        make clean || true
+        rm -rf node_modules ext/frida*
+        export R2PM_OFFLINE=1
+        make io_frida.so
+
+    # 8️⃣ Upload artifact
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: r2frida-android-arm64
+        path: r2frida/src/io_frida.so
+        
