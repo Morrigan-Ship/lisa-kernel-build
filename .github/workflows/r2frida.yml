@@ -23,10 +23,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt update
-        sudo apt install -y build-essential git pkg-config python3 python3-pip \
-          clang libssl-dev libelf-dev unzip curl xz-utils
-        pip3 install --user meson ninja
-        echo "$HOME/.local/bin" >> $GITHUB_PATH
+        sudo apt install -y build-essential git pkg-config python3 python3-pip clang libssl-dev libelf-dev unzip curl
 
     # 3️⃣ Descarcă și dezarhivează Android NDK
     - name: Download Android NDK
@@ -34,12 +31,19 @@ jobs:
         curl -LO https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
         unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip -d $GITHUB_WORKSPACE/android-ndk
 
-    # 4️⃣ Setare PATH pentru NDK și toolchain
+    # 4️⃣ Setare toolchain + sysroot
     - name: Setup NDK toolchain
       run: |
-        echo "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
-        echo "CC=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android${ANDROID_API}-clang" >> $GITHUB_ENV
-        echo "CXX=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android${ANDROID_API}-clang++" >> $GITHUB_ENV
+        export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
+        echo "TOOLCHAIN=$TOOLCHAIN" >> $GITHUB_ENV
+        echo "CC=$TOOLCHAIN/bin/aarch64-linux-android${ANDROID_API}-clang" >> $GITHUB_ENV
+        echo "CXX=$TOOLCHAIN/bin/aarch64-linux-android${ANDROID_API}-clang++" >> $GITHUB_ENV
+        echo "AR=$TOOLCHAIN/bin/llvm-ar" >> $GITHUB_ENV
+        echo "LD=$TOOLCHAIN/bin/ld" >> $GITHUB_ENV
+        echo "AS=$TOOLCHAIN/bin/llvm-as" >> $GITHUB_ENV
+        echo "CFLAGS=--sysroot=$TOOLCHAIN/sysroot" >> $GITHUB_ENV
+        echo "LDFLAGS=--sysroot=$TOOLCHAIN/sysroot" >> $GITHUB_ENV
+        echo "$TOOLCHAIN/bin" >> $GITHUB_PATH
 
     # 5️⃣ Clone radare2 și r2frida
     - name: Clone repositories
@@ -71,4 +75,3 @@ jobs:
       with:
         name: r2frida-android-arm64
         path: r2frida/io_frida.so
-        
