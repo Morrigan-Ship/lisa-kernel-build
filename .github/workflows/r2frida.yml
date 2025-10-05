@@ -1,39 +1,212 @@
-name: Build r2frida
+name: ci
+
+env:
+  R2V: 6.0.4
 
 on:
   push:
-    branches: [ main, master ]
+    branches:
+    - master
   pull_request:
-    branches: [ main, master ]
+
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    
+  build-fridatools:
+    # fails because of a bug in frida on ubuntu20 .. probably invalid stat struct
+    runs-on: ubuntu-22.04
+    continue-on-error: true
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-
-    - name: Install system dependencies
+    - uses: actions/checkout@v5
+    - name: Testing stat for frida-fs
+      run: make -C dist/docker test
+    - name: Installing radare2
       run: |
-        sudo apt-get update
-        sudo apt-get install -y make gcc g++ libzip-dev nodejs npm curl pkg-config git libssl-dev
-
-    - name: Install radare2 from source
+        wget https://github.com/radareorg/radare2/releases/download/${{env.R2V}}/radare2_${{env.R2V}}_amd64.deb
+        wget https://github.com/radareorg/radare2/releases/download/${{env.R2V}}/radare2-dev_${{env.R2V}}_amd64.deb
+        sudo dpkg -i radare2_${{env.R2V}}_amd64.deb
+        sudo dpkg -i radare2-dev_${{env.R2V}}_amd64.deb
+        sudo pip install frida-tools
+    - name: Building r2frida
+      run: ./configure && make -j USE_FRIDA_TOOLS=1 && sudo make install
+    - name: Testing r2frida
+      run: make -C test
+    - name: Packaging
+      run: make -C dist/debian USE_FRIDA_TOOLS=1
+  build-linux22:
+    # fails because of a bug in frida on ubuntu20 .. probably invalid stat struct
+    runs-on: ubuntu-22.04
+    continue-on-error: true
+    steps:
+    - uses: actions/checkout@v5
+    - name: Testing stat for frida-fs
+      run: make -C dist/docker test
+    - name: Installing radare2
       run: |
-        git clone --depth 1 https://github.com/radareorg/radare2.git
-        cd radare2
-        sys/install.sh
-        r2 -v
-
-    - name: Clone and build r2frida
+        wget https://github.com/radareorg/radare2/releases/download/${{env.R2V}}/radare2_${{env.R2V}}_amd64.deb
+        wget https://github.com/radareorg/radare2/releases/download/${{env.R2V}}/radare2-dev_${{env.R2V}}_amd64.deb
+        sudo dpkg -i radare2_${{env.R2V}}_amd64.deb
+        sudo dpkg -i radare2-dev_${{env.R2V}}_amd64.deb
+    - name: Building r2frida
+      run: ./configure && make -j && sudo make install
+    - name: Testing r2frida
+      run: make -C test
+    - name: Packaging
+      run: make -C dist/debian
+    - name: Pub
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-linux22
+        path: dist/debian/*.deb
+  build-linux22-precompiled:
+    runs-on: ubuntu-22.04
+    continue-on-error: true
+    steps:
+    - uses: actions/checkout@v5
+    - name: Installing radare2
       run: |
-        git clone --depth 1 https://github.com/nowsecure/r2frida.git
-        cd r2frida
-        ./configure
-        make
-        make user-instail
-
-    - name: Test r2frida
+        wget https://github.com/radareorg/radare2/releases/download/${{env.R2V}}/radare2_${{env.R2V}}_amd64.deb
+        wget https://github.com/radareorg/radare2/releases/download/${{env.R2V}}/radare2-dev_${{env.R2V}}_amd64.deb
+        sudo dpkg -i radare2_${{env.R2V}}_amd64.deb
+        sudo dpkg -i radare2-dev_${{env.R2V}}_amd64.deb
+    - name: Building r2frida
+      run: ./configure --with-precompiled-agent && make -j && sudo make install
+    - name: Packaging
+      run: make -C dist/debian R2CFG_FLAGS=--with-precompiled-agent
+  build-linux24:
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v5
+    - name: Building Radare2
+      run: ( git clone --depth=1 https://github.com/radareorg/radare2 && cd radare2 && sys/install.sh --with-rpath /usr )
+    - name: Testing stat for frida-fs
+      run: make -C dist/docker test
+    - name: Building r2frida
+      run: ./configure && make -j && sudo make install
+    - name: Packaging
+      run: make -C dist/debian
+    - name: Pub
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-linux24
+        path: dist/debian/*.deb
+  build-agent:
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v5
+    - name: Building Radare2
+      run: ( git clone --depth=1 https://github.com/radareorg/radare2 && cd radare2 && export CFLAGS=-O0 && sys/install.sh --with-rpath /usr )
+    - name: Building r2frida
+      run: ./configure && make -j && sudo make install
+    - name: Pub
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-agent
+        path: src/_agent.js
+  build-macos:
+    runs-on: macos-14
+    steps:
+    - uses: actions/checkout@v5
+    - name: Install dependencies
+      run: brew install pkg-config
+    - name: Building Radare2
+      run: ( git clone --depth=1 https://github.com/radareorg/radare2 && cd radare2 && export CFLAGS=-O0 && ./configure && make -j && sudo make install )
+    - name: Building r2frida
+      run: ./configure && make -j && sudo make install
+    - name: Packaging
+      run: make -C dist/macos
+    - name: Pub
+      uses: actions/upload-artifact@v4
+      with:
+        if-no-files-found: error
+        name: build-macos
+        path: dist/macos/r2frida-*.pkg
+  build-windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v5
+    - uses: actions/setup-python@v5
+      with:
+        python-version: 3.12.x
+    - name: Preparing msvc toolchain
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64
+    - name: dependencies
+      shell: bash
       run: |
-        ~/.local/share/radare2/plugins/r2frida.js --version || echo "r2frida built successfully"
+        pip install ninja meson wget
+        choco install zip
+    - name: install r2
+      shell: bash
+      run: |
+        python -m wget https://github.com/radareorg/radare2/releases/download/${{env.R2V}}/radare2-${{env.R2V}}-w64.zip -o r2.zip
+        unzip r2.zip
+        mv radare2-${{env.R2V}}-w64 radare2 || mv radare2-w64-${{env.R2V}} radare2
+        pwd
+    - name: make
+      shell: cmd
+      run: make.bat
+    - name: zip
+      shell: cmd
+      # run: zip -r r2frida-${{env.R2V}}-w64.zip src\io_frida.dll
+      run: zip -r r2frida-${{env.R2V}}-w64.zip src\r2frida-compile.exe
+    - uses: actions/upload-artifact@v4
+      with:
+        if-no-files-found: error
+        name: build-windows
+        path: r2frida-${{env.R2V}}-w64.zip
+
+  check_release:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+    outputs:
+      is_release: ${{ steps.release.outputs.is }}
+      tag_name: ${{ steps.release.outputs.tag }}
+    needs:
+    - build-linux22
+    - build-linux24
+    - build-macos
+    - build-windows
+    - build-agent
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: 0 # Download all git history and tags
+    - name: Check if is a release
+      run: git describe --exact-match --tags ${{ github.sha }} | awk 'BEGIN{tag="-";r="no"}/^[0-9]+\.[0-9]+/{tag=$0;r="yes"};END{print "::set-output name=is::"r;print "::set-output name=tag::"tag}'
+      id: release
+  release:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' && needs.check_release.outputs.is_release == 'yes' }}
+    needs:
+    - check_release
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: 0 # Download all git history and tags
+    - name: Extract r2f version
+      run: echo "##[set-output name=branch;]$( ./configure -qV )"
+      id: r2fv
+    - name: Prepare release notes
+      run: ./sys/release-notes.sh | tee ./RELEASE_NOTES.md
+    - name: Download artifacts
+      uses: actions/download-artifact@v5
+      with:
+        path: dist/artifacts
+    - name: Create GitHub release
+      id: create_release
+      uses: softprops/action-gh-release@v2.3.2
+      with:
+        name: ${{ steps.r2fv.outputs.branch }}
+        tag_name: ${{ needs.check_release.outputs.tag_name }}
+        body_path: ./RELEASE_NOTES.md
+        draft: false
+        prerelease: false
+        generate_release_notes: false
+        files: |
+          dist/artifacts/build-linux24/r2frida_*_amd64.deb
+          dist/artifacts/build-agent/_agent.js
+          dist/artifacts/build-macos/r2frida-*-x64.pkg
+          dist/artifacts/build-windows/r2frida-*-w64.zip
