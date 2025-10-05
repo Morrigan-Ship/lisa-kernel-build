@@ -64,7 +64,7 @@ jobs:
 
     # 8️⃣ Upload artifact
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: r2frida-android-arm64
         path: r2frida/src/io_frida.so
