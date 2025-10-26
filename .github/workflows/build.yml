@@ -25,7 +25,7 @@ jobs:
 
     - name: Download kernel source (Lisa r-oss)
       run: |
-        git clone --depth=1 https://github.com/MiCode/Xiaomi_Kernel_OpenSource -b lisa-r-oss kernel/lisa
+        git clone --depth=1 https://git.codelinaro.org/clo/la/kernel/msm-5.4.git -b LA.UM.9.16.r1-18400-MANNAR.QSSI15.0 kernel/lisa
     - name: Copy custom defconfig
       run: |
         cp $GITHUB_WORKSPACE/lisa_defconfig kernel/lisa/arch/arm64/configs/lisa_defconfig
@@ -42,7 +42,9 @@ jobs:
         mkdir -p out
         make O=out clean
         make O=out mrproper
-        make O=out ARCH=arm64 gki_defconfig
+        #make O=out ARCH=arm64 gki_defconfig
+
+        cp $GITHUB_WORKSPACE/lisa_defconfig kernel/lisa/.config
         make O=out ARCH=arm64 olddefconfig
         make -j$(nproc) O=out ARCH=arm64 \
           CC=clang \
@@ -52,7 +54,8 @@ jobs:
          # concat Image.gz + dtbs
         cat out/arch/arm64/boot/Image.gz out/arch/arm64/boot/dts/qcom/*.dtb > out/arch/arm64/boot/Image.gz-dtb
         cp out/arch/arm64/boot/Image.gz-dtb $GITHUB_WORKSPACE/AnyKernel3/
-
+        cp out/arch/arm64/boot/Image.gz $GITHUB_WORKSPACE/AnyKernel3/
+        
     - name: Package AnyKernel3 zip
       run: |
         cd AnyKernel3
