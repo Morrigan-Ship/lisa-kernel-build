@@ -29,7 +29,7 @@ jobs:
     - name: Copy custom defconfig
       run: |
         cp $GITHUB_WORKSPACE/lisa_defconfig kernel/lisa/arch/arm64/configs/lisa_defconfig
-        cp $GITHUB_WORKSPACE/lisa_defconfig kernel/lisa/.config
+        #cp $GITHUB_WORKSPACE/lisa_defconfig kernel/lisa/.config
 
     - name: Download AnyKernel3
       run: |
@@ -42,7 +42,7 @@ jobs:
         mkdir -p out
         make O=out clean
         make O=out mrproper
-        #make O=out ARCH=arm64 gki_defconfig
+        #make O=out ARCH=arm64 lisa_defconfig
 
         #cp $GITHUB_WORKSPACE/lisa_defconfig kernel/lisa/.config
         make O=out ARCH=arm64 olddefconfig
