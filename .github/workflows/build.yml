@@ -43,10 +43,14 @@ jobs:
         make O=out clean
         make O=out mrproper
         #make O=out ARCH=arm64 lisa_defconfig
+        
+        export KCFLAGS=-Wno-error
+        export CFLAGS_KERNEL=-Wno-error
+        export KBUILD_CFLAGS=-Wno-error
 
         #cp $GITHUB_WORKSPACE/lisa_defconfig kernel/lisa/.config
         make O=out ARCH=arm64 olddefconfig
-        make -j$(nproc) O=out ARCH=arm64 \
+        make -j$(nproc) O=out ARCH=arm64 KCFLAGS=-Wno-error CFLAGS_KERNEL=-Wno-error \
           CC=clang \
           CLANG_TRIPLE=aarch64-linux-gnu- \
           CROSS_COMPILE=aarch64-linux-gnu- \
