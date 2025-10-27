@@ -48,7 +48,11 @@ jobs:
         export KBUILD_CFLAGS=-Wno-error
 
         make O=out ARCH=arm64 olddefconfig
-        make -j$(nproc) O=out ARCH=arm64 KCFLAGS="-Wno-error" HOSTCFLAGS="-Wno-error" \
+        make -j$(nproc) O=out ARCH=arm64 \
+          KCFLAGS="-Wno-error" HOSTCFLAGS="-Wno-error" \
+          EXTRA_CFLAGS="-Wno-error -Wno-error=strict-prototypes" \
+          KBUILD_CFLAGS="-Wno-error -Wno-error=strict-prototypes" \
+          KBUILD_USERCFLAGS="-Wno-error -Wno-error=strict-prototypes" \
           CC=clang \
           CLANG_TRIPLE=aarch64-linux-gnu- \
           CROSS_COMPILE=aarch64-linux-gnu- \
